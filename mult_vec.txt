@@ -1,0 +1,89 @@
+!nvidia-smi
+
+
+!nvcc --version
+
+
+#include <stdio.h>
+#include <cuda_runtime.h>
+
+#define N 3
+
+// CUDA Kernel
+__global__ void matrixMultiply(int *A, int *B, int *C) {
+
+    int row = threadIdx.y;
+    int col = threadIdx.x;
+
+    int sum = 0;
+
+    for(int k = 0; k < N; k++) {
+        sum += A[row * N + k] * B[k * N + col];
+    }
+
+    C[row * N + col] = sum;
+}
+
+int main() {
+
+    int A[N][N] = {
+        {1,2,3},
+        {4,5,6},
+        {7,8,9}
+    };
+
+    int B[N][N] = {
+        {1,0,0},
+        {0,1,0},
+        {0,0,1}
+    };
+
+    int C[N][N];
+
+    int *d_A, *d_B, *d_C;
+
+    int size = N * N * sizeof(int);
+
+    // Allocate GPU memory
+    cudaMalloc((void**)&d_A, size);
+    cudaMalloc((void**)&d_B, size);
+    cudaMalloc((void**)&d_C, size);
+
+    // Copy matrices to GPU
+    cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice);
+
+    // Launch kernel
+    dim3 threadsPerBlock(N, N);
+
+    matrixMultiply<<<1, threadsPerBlock>>>(d_A, d_B, d_C);
+
+    // Wait for GPU
+    cudaDeviceSynchronize();
+
+    // Copy result back
+    cudaMemcpy(C, d_C, size, cudaMemcpyDeviceToHost);
+
+    // Print result
+    printf("Result Matrix:\n");
+
+    for(int i = 0; i < N; i++) {
+        for(int j = 0; j < N; j++) {
+            printf("%d ", C[i][j]);
+        }
+        printf("\n");
+    }
+
+    // Free memory
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+
+    return 0;
+}
+
+
+!nvcc matrix_mul.cu -o matrix_mul
+
+
+!./matrix_mul
